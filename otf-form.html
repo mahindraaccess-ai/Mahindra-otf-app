@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="theme-color" content="#f5f4ef"/>
+<title>Form Digitizer AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+/* ── RESET & TOKENS ──────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f4ef;
+  --paper:#ffffff;
+  --ink:#0d0d0d;
+  --ink2:#4a4a4a;
+  --ink3:#9a9a9a;
+  --red:#d42b22;
+  --blue:#1548c8;
+  --green:#1a7f3c;
+  --border:#c8c8c0;
+  --row:#f9f9f7;
+  --bar:#111111;
+  --bar-h:66px;
+  --safe:env(safe-area-inset-bottom,0px);
+  --ff:'DM Sans',sans-serif;
+  --fm:'Courier Prime',monospace;
+}
+html{height:100%;background:var(--bg)}
+body{height:100%;font-family:var(--ff);background:var(--bg);overflow:hidden}
+
+/* ── SCROLL SHELL ────────────────────────────────────────────────────── */
+#shell{
+  height:100dvh;
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding-bottom:calc(var(--bar-h) + var(--safe) + 8px);
+  -webkit-overflow-scrolling:touch;
+  scroll-behavior:smooth;
+}
+
+/* ── TOP HEADER ──────────────────────────────────────────────────────── */
+#topbar{
+  position:sticky;top:0;z-index:20;
+  background:var(--bg);
+  border-bottom:1px solid var(--border);
+  text-align:center;
+  padding:11px 16px 9px;
+}
+#topbar h1{font-size:14px;font-weight:600;letter-spacing:.04em;color:var(--ink)}
+#topbar p{font-size:10px;color:var(--ink3);margin-top:1px;letter-spacing:.02em}
+
+/* ── TOAST ───────────────────────────────────────────────────────────── */
+#toast{
+  display:none;
+  margin:7px 10px;
+  padding:9px 12px;
+  border-radius:6px;
+  font-size:12px;font-weight:500;
+  align-items:center;gap:8px;
+  animation:fadeUp .2s ease;
+}
+#toast.show{display:flex}
+#toast.info   {background:#e8f0fe;color:#1548c8;border:1px solid #c3d3f8}
+#toast.ok     {background:#e6f4ea;color:#1a7f3c;border:1px solid #b7dfbf}
+#toast.err    {background:#fde8e8;color:#c0392b;border:1px solid #f5b7b7}
+#toast svg{flex-shrink:0}
+@keyframes fadeUp{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinning{animation:spin .9s linear infinite;display:inline-block}
+
+/* ── PAPER FORM ──────────────────────────────────────────────────────── */
+#paper{
+  margin:8px 8px 0;
+  background:var(--paper);
+  border:1px solid var(--border);
+  border-radius:3px;
+  box-shadow:0 1px 8px rgba(0,0,0,.09);
+}
+
+/* FORM HEAD */
+.fhead{padding:12px 12px 10px;border-bottom:2.5px solid var(--ink)}
+.fhead-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px}
+.brand-m{font-family:var(--fm);font-size:34px;font-weight:700;line-height:1;color:var(--ink)}
+.brand-sub{font-size:7.5px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--ink2);margin-top:3px}
+.otf-stamp{
+  border:2px solid var(--ink);
+  padding:5px 10px;
+  font-size:11px;font-weight:700;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink);text-align:center;
+  align-self:center;white-space:nowrap;
+}
+.fno-wrap{text-align:right;min-width:80px}
+.fno-label{font-size:10px;font-weight:500;color:var(--ink2);display:block}
+.fno-input{
+  font-family:var(--fm);font-size:20px;font-weight:700;
+  color:var(--red);
+  border:none;border-bottom:2px solid #ffc8c6;
+  background:#fff8f7;outline:none;
+  width:80px;text-align:right;padding:2px 2px;
+  display:block;margin-top:1px;
+}
+.mah-label{font-size:9px;color:var(--ink3);font-weight:500;letter-spacing:.04em}
+
+/* FIELD ROWS */
+.field-section{padding:2px 4px 4px}
+.fg{display:grid;grid-template-columns:1fr 1fr}
+.fr{
+  display:flex;align-items:baseline;gap:5px;
+  padding:5px 4px 4px;
+  border-bottom:1px solid #ebebE5;
+}
+.fr.full{grid-column:1/-1}
+.fl{font-size:10px;color:var(--ink2);white-space:nowrap;flex-shrink:0;font-weight:500}
+.fi{
+  border:none;outline:none;
+  font-family:var(--ff);font-size:11.5px;font-weight:600;
+  color:var(--blue);background:transparent;
+  flex:1;min-width:0;
+}
+.fi::placeholder{color:#d0d0d0;font-weight:400}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto;padding:4px 8px 10px}
+table{
+  width:100%;border-collapse:collapse;
+  font-size:10px;margin-top:6px;
+  min-width:320px;
+}
+thead tr{background:#eeeeea}
+th{
+  border:1px solid var(--ink);
+  padding:5px 3px;font-weight:700;
+  font-size:9.5px;text-align:center;
+  white-space:nowrap;letter-spacing:.02em;
+}
+td{border:1px solid #bbb;padding:0}
+td.sl{
+  text-align:center;padding:3px 2px;
+  font-size:9px;color:var(--ink3);
+  background:#f8f8f6;width:26px;
+}
+td input{
+  border:none;outline:none;width:100%;
+  padding:3px 3px;font-family:var(--ff);
+  font-size:10.5px;font-weight:500;
+  color:var(--blue);background:transparent;
+}
+td input:focus{background:#eff6ff}
+td input.tc{text-align:center}
+td input.tr{text-align:right}
+tfoot td{border:1px solid var(--ink);padding:6px 6px;font-weight:700;font-size:11px}
+.tlbl{text-align:right;background:#f5f5f0;color:var(--ink);letter-spacing:.07em}
+.tval{
+  text-align:right;background:#f0fff4;
+  color:var(--green);font-family:var(--fm);
+  font-size:12px;width:62px;
+}
+
+/* FOOTER */
+.ffoot{padding:10px 12px}
+.fit-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.fit-block label{display:block;font-size:9.5px;color:var(--ink2);font-weight:500;margin-bottom:3px;line-height:1.4}
+.fit-block input{
+  border:none;border-bottom:1px solid var(--border);outline:none;
+  width:100%;font-size:11px;font-weight:600;color:var(--blue);
+  background:transparent;padding:2px 0;
+}
+.terms-box{
+  border:1px solid var(--border);border-radius:3px;
+  padding:8px 9px;background:#fafaf8;margin-bottom:18px;
+}
+.terms-box h4{font-size:10.5px;font-weight:700;margin-bottom:5px}
+.terms-box ol{padding-left:13px}
+.terms-box li{font-size:9px;color:var(--ink2);line-height:1.55;margin-bottom:2px}
+.eoe{font-size:8.5px;color:var(--ink3);margin-top:4px}
+.signs{display:flex;justify-content:space-around;margin-top:26px;padding-bottom:8px;gap:6px}
+.sign{text-align:center;flex:1}
+.sline{border-top:1px solid var(--ink);padding-top:4px;font-size:8.5px;color:var(--ink2);line-height:1.4}
+.sfor{font-size:9.5px;font-weight:700;margin-bottom:18px;color:var(--ink)}
+
+/* ── BOTTOM BAR ──────────────────────────────────────────────────────── */
+#bar{
+  position:fixed;bottom:0;left:0;right:0;
+  height:calc(var(--bar-h) + var(--safe));
+  padding-bottom:var(--safe);
+  background:var(--bar);
+  display:flex;align-items:center;
+  justify-content:space-around;
+  padding-left:4px;padding-right:4px;
+  z-index:100;
+  box-shadow:0 -2px 16px rgba(0,0,0,.38);
+}
+.bb{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  background:none;border:none;
+  font-family:var(--ff);font-size:9px;font-weight:500;letter-spacing:.03em;
+  cursor:pointer;color:#888;
+  padding:6px 6px;border-radius:8px;
+  -webkit-tap-highlight-color:transparent;
+  transition:transform .1s,background .1s;
+  min-width:44px;
+}
+.bb:active{transform:scale(.88);background:#222}
+.bb:disabled{opacity:.3;pointer-events:none}
+.bb svg{display:block}
+.bb.cam {color:#60a5fa}
+.bb.gal {color:#a78bfa}
+.bb.prt {color:#34d399}
+.bb.clr {color:#f87171}
+.bb.save{
+  background:#1548c8;color:#fff;
+  flex-direction:row;gap:6px;
+  font-size:11px;font-weight:600;
+  padding:10px 14px;border-radius:10px;
+  min-width:108px;justify-content:center;
+  box-shadow:0 2px 8px rgba(21,72,200,.45);
+}
+.bb.save:active{background:#0e35a0}
+
+/* ── PRINT ────────────────────────────────────────────────────────────── */
+@media print{
+  #bar,#topbar,#toast{display:none!important}
+  #shell{height:auto;overflow:visible;padding-bottom:0}
+  #paper{margin:0;border:none;box-shadow:none;border-radius:0}
+}
+</style>
+</head>
+<body>
+
+<!-- CONFIG: replace these two values -->
+<script>
+const VISION_KEY   = "YOUR_GOOGLE_CLOUD_VISION_API_KEY";
+const BACKEND_URL  = "https://your-backend.onrender.com/submit";
+// Optional: set a secret token matching your backend
+const SECRET_TOKEN = "YOUR_SECRET_TOKEN";
+</script>
+
+<div id="shell">
+
+  <!-- TOP HEADER -->
+  <div id="topbar">
+    <h1>Form Digitizer AI</h1>
+    <p>Auto-saves locally &nbsp;·&nbsp; Google Cloud Vision OCR</p>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast">
+    <svg id="toast-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/></svg>
+    <span id="toast-msg"></span>
+  </div>
+
+  <!-- PAPER FORM -->
+  <div id="paper">
+
+    <!-- HEAD -->
+    <div class="fhead">
+      <div class="fhead-top">
+        <div>
+          <div class="brand-m">M</div>
+          <div class="brand-sub">Vayalat</div>
+        </div>
+        <div class="otf-stamp">ORDER TAKING FORM</div>
+        <div class="fno-wrap">
+          <span class="fno-label">Form No:</span>
+          <input class="fno-input" id="f-otf" placeholder="0000" maxlength="10"/>
+          <div class="mah-label">Mahindra</div>
+        </div>
+      </div>
+
+      <div class="field-section">
+        <div class="fg">
+          <div class="fr">
+            <span class="fl">Outlet:</span>
+            <input class="fi" id="f-outlet" autocomplete="off"/>
+          </div>
+          <div class="fr">
+            <span class="fl">Date:</span>
+            <input class="fi" id="f-date" autocomplete="off"/>
+          </div>
+          <div class="fr full">
+            <span class="fl">Customer's&nbsp;Name:</span>
+            <input class="fi" id="f-cname" autocomplete="off"/>
+          </div>
+          <div class="fr full">
+            <span class="fl">Customer&nbsp;Code:</span>
+            <input class="fi" id="f-ccode" autocomplete="off"/>
+          </div>
+          <div class="fr">
+            <span class="fl">Engine&nbsp;No:</span>
+            <input class="fi" id="f-eng" autocomplete="off"/>
+          </div>
+          <div class="fr">
+            <span class="fl">Reg.&nbsp;No:</span>
+            <input class="fi" id="f-reg" autocomplete="off"/>
+          </div>
+          <div class="fr full">
+            <span class="fl">Chassis&nbsp;No:</span>
+            <input class="fi" id="f-chassis" autocomplete="off"/>
+          </div>
+        </div>
+      </div>
+    </div><!-- /fhead -->
+
+    <!-- TABLE -->
+    <div class="tbl-wrap">
+      <table id="items-table">
+        <thead>
+          <tr>
+            <th>Sl.No</th>
+            <th>Item Description</th>
+            <th>Part Number(s)</th>
+            <th>Qty</th>
+            <th>CRP</th>
+          </tr>
+        </thead>
+        <tbody id="tbl-body"></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4" class="tlbl">TOTAL PRICE:</td>
+            <td class="tval" id="total-cell">₹0</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="ffoot">
+      <div class="fit-grid">
+        <div class="fit-block">
+          <label>Received for Fitment<br>[Date &amp; Time]</label>
+          <input id="f-fitment" autocomplete="off"/>
+        </div>
+        <div class="fit-block">
+          <label>Vehicle Delivery<br>Date &amp; Time</label>
+          <input id="f-delivery" autocomplete="off"/>
+        </div>
+      </div>
+
+      <div class="terms-box">
+        <h4>Terms &amp; Condition</h4>
+        <ol>
+          <li>The price ruling at the time of delivery only will be applicable irrespective of the fact as when payment was made.</li>
+          <li>This is not a firm order and no claim for priority can be made on the basis of this quotation / Performa.</li>
+          <li>The price quoted is for immediate delivery only. In case of any increase in price by the manufacturer before delivery the order shall be construed as if the increased prices were originally inserted therein.</li>
+        </ol>
+        <p class="eoe">E &amp; O E</p>
+      </div>
+
+      <div class="signs">
+        <div class="sign">
+          <div class="sline">Name &amp; Sign of<br>Customer</div>
+        </div>
+        <div class="sign">
+          <div class="sline">Name &amp; Sign of<br>Sales/Accessory<br>Executive</div>
+        </div>
+        <div class="sign">
+          <div class="sfor">For Vayalat Mahindra</div>
+          <div class="sline">Name &amp; Sign of<br>Sales Manager</div>
+        </div>
+      </div>
+    </div><!-- /ffoot -->
+
+  </div><!-- /paper -->
+</div><!-- /shell -->
+
+<!-- HIDDEN FILE INPUTS -->
+<input type="file" id="inp-cam" accept="image/*" capture="environment" style="display:none"/>
+<input type="file" id="inp-gal" accept="image/*" style="display:none"/>
+
+<!-- BOTTOM ACTION BAR -->
+<div id="bar">
+  <button class="bb cam" id="btn-cam" onclick="document.getElementById('inp-cam').click()">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>
+    </svg>
+    Scan
+  </button>
+
+  <button class="bb gal" id="btn-gal" onclick="document.getElementById('inp-gal').click()">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+    </svg>
+    Upload
+  </button>
+
+  <button class="bb save" id="btn-save" onclick="submitForm()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+    </svg>
+    Save to Sheet
+  </button>
+
+  <button class="bb prt" onclick="window.print()">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+    </svg>
+    Print
+  </button>
+
+  <button class="bb clr" onclick="clearForm()">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+    </svg>
+    Clear
+  </button>
+</div>
+
+<script>
+/* ── STATE ─────────────────────────────────────────────────────────── */
+const ROWS = 45;
+let items = Array.from({length:ROWS},(_,i)=>({slNo:i+1,desc:'',part:'',qty:'',crp:''}));
+
+const todayStr = () => {
+  const d=new Date();
+  return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
+};
+
+/* ── BUILD TABLE ───────────────────────────────────────────────────── */
+function buildTable(){
+  const tb=document.getElementById('tbl-body');
+  tb.innerHTML='';
+  items.forEach((it,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td class="sl">${it.slNo}</td>
+      <td><input value="${esc(it.desc)}" oninput="setIt(${i},'desc',this.value)" placeholder=""/></td>
+      <td><input value="${esc(it.part)}" oninput="setIt(${i},'part',this.value)" placeholder=""/></td>
+      <td><input class="tc" value="${esc(it.qty)}"  oninput="setIt(${i},'qty',this.value)"  placeholder=""/></td>
+      <td><input class="tr" value="${esc(it.crp)}"  oninput="setIt(${i},'crp',this.value)"  placeholder=""/></td>`;
+    tb.appendChild(tr);
+  });
+  updateTotal();
+}
+function esc(s){return String(s).replace(/"/g,'&quot;').replace(/</g,'&lt;')}
+
+function setIt(i,k,v){items[i][k]=v;updateTotal();saveLocal()}
+function updateTotal(){
+  const sum=items.reduce((s,it)=>{const n=parseFloat((it.crp||'').replace(/[^0-9.]/g,''));return s+(isNaN(n)?0:n);},0);
+  document.getElementById('total-cell').textContent='₹'+sum.toLocaleString('en-IN');
+}
+function getTotal(){
+  return items.reduce((s,it)=>{const n=parseFloat((it.crp||'').replace(/[^0-9.]/g,''));return s+(isNaN(n)?0:n);},0);
+}
+
+/* ── FIELD HELPERS ─────────────────────────────────────────────────── */
+const $ = id => document.getElementById(id);
+const fieldIds = ['f-otf','f-outlet','f-date','f-cname','f-ccode','f-eng','f-reg','f-chassis','f-fitment','f-delivery'];
+
+function getFormObj(){
+  return {
+    otfNumber:$('f-otf').value, outlet:$('f-outlet').value,
+    date:$('f-date').value, customerName:$('f-cname').value,
+    customerCode:$('f-ccode').value, regNo:$('f-reg').value,
+    engineNo:$('f-eng').value, chassisNo:$('f-chassis').value,
+    receivedForFitment:$('f-fitment').value, vehicleDelivery:$('f-delivery').value
+  };
+}
+function setFormObj(o){
+  if(o.otfNumber)         $('f-otf').value     = o.otfNumber;
+  if(o.outlet)            $('f-outlet').value  = o.outlet;
+  if(o.date)              $('f-date').value    = o.date;
+  if(o.customerName)      $('f-cname').value   = o.customerName;
+  if(o.customerCode)      $('f-ccode').value   = o.customerCode;
+  if(o.regNo)             $('f-reg').value     = o.regNo;
+  if(o.engineNo)          $('f-eng').value     = o.engineNo;
+  if(o.chassisNo)         $('f-chassis').value = o.chassisNo;
+  if(o.receivedForFitment) $('f-fitment').value = o.receivedForFitment;
+  if(o.vehicleDelivery)   $('f-delivery').value= o.vehicleDelivery;
+}
+
+/* ── LOCAL STORAGE ─────────────────────────────────────────────────── */
+function saveLocal(){
+  try{localStorage.setItem('otf_v2',JSON.stringify({fields:getFormObj(),items}));}catch{}
+}
+function loadLocal(){
+  try{
+    const s=localStorage.getItem('otf_v2');
+    if(!s)return;
+    const d=JSON.parse(s);
+    if(d.fields) setFormObj(d.fields);
+    if(d.items&&Array.isArray(d.items)){
+      d.items.forEach((it,i)=>{if(i<ROWS) items[i]=it;});
+      buildTable();
+    }
+  }catch{}
+}
+fieldIds.forEach(id=>{
+  const el=$(id);
+  if(el) el.addEventListener('input',saveLocal);
+});
+
+/* ── CLEAR ─────────────────────────────────────────────────────────── */
+function clearForm(){
+  if(!confirm('Clear the entire form?'))return;
+  fieldIds.forEach(id=>{const el=$(id);if(el)el.value='';});
+  $('f-date').value=todayStr();
+  items=Array.from({length:ROWS},(_,i)=>({slNo:i+1,desc:'',part:'',qty:'',crp:''}));
+  buildTable();
+  localStorage.removeItem('otf_v2');
+}
+
+/* ── TOAST ─────────────────────────────────────────────────────────── */
+let toastTimer;
+function toast(msg,type='info'){
+  clearTimeout(toastTimer);
+  const el=$('toast'), ic=$('toast-icon'), tx=$('toast-msg');
+  el.className='show '+type;
+  tx.textContent=msg;
+  // icon swap
+  if(type==='info'){
+    ic.innerHTML='<circle cx="12" cy="12" r="10"/>';
+    ic.classList.add('spinning');
+  } else {
+    ic.classList.remove('spinning');
+    if(type==='ok')   ic.innerHTML='<polyline points="20 6 9 17 4 12"/>';
+    if(type==='err')  ic.innerHTML='<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>';
+    toastTimer=setTimeout(()=>{el.className='';},4500);
+  }
+}
+function clearToast(){$('toast').className='';clearTimeout(toastTimer);}
+
+/* ── DISABLE BUTTONS ───────────────────────────────────────────────── */
+function setBusy(b){
+  ['btn-cam','btn-gal','btn-save'].forEach(id=>{
+    const el=$(id); if(el) el.disabled=b;
+  });
+}
+
+/* ── FILE → BASE64 ─────────────────────────────────────────────────── */
+const toB64 = f => new Promise((res,rej)=>{
+  const r=new FileReader();
+  r.readAsDataURL(f);
+  r.onload=()=>res(r.result.split(',')[1]);
+  r.onerror=rej;
+});
+
+/* ── OCR PARSER ────────────────────────────────────────────────────── */
+function parseOcr(text){
+  const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
+  const find=(...kws)=>{
+    for(const l of lines) for(const kw of kws){
+      const m=l.match(new RegExp(kw+'[:\\s]+(.+)','i'));
+      if(m) return m[1].trim();
+    }
+    return '';
+  };
+  const ex={
+    otfNumber: find('Form No','OTF No','Order No'),
+    outlet:    find('Outlet'),
+    date:      '',
+    customerName:  find("Customer'?s? Name","Customer Name"),
+    customerCode:  find('Customer Code','Cust Code'),
+    regNo:    find('Reg\\.? No','Registration No'),
+    engineNo: find('Engine No'),
+    chassisNo:find('Chasis No','Chassis No','Chaiss No'),
+    receivedForFitment: find('Received for Fitment','Fitment'),
+    vehicleDelivery:    find('Vehicle Delivery','Delivery'),
+    parsedItems:[]
+  };
+  const dm=text.match(/\b(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})\b/);
+  if(dm){const p=dm[1].split(/[-\/]/);if(p.length===3){const y=p[2].length===2?'20'+p[2]:p[2];ex.date=`${p[0].padStart(2,'0')}-${p[1].padStart(2,'0')}-${y}`;}}
+  for(const l of lines){
+    const m=l.match(/^(\d{1,2})\s+(.+?)(?:\s{2,}|\t)(.{0,30}?)(?:\s{2,}|\t)(\d+)(?:\s{2,}|\t)([\d.,]+)$/);
+    if(m){const n=+m[1];if(n>=1&&n<=ROWS) ex.parsedItems.push({slNo:n,desc:m[2].trim(),part:m[3].trim(),qty:m[4].trim(),crp:m[5].trim()});continue;}
+    const s=l.match(/^(\d{1,2})[.)]\s+(.+)/);
+    if(s){const n=+s[1];if(n>=1&&n<=ROWS&&!ex.parsedItems.find(i=>i.slNo===n)) ex.parsedItems.push({slNo:n,desc:s[2].trim(),part:'',qty:'',crp:''});}
+  }
+  return ex;
+}
+
+/* ── SCAN / OCR ────────────────────────────────────────────────────── */
+async function doScan(file){
+  if(!file)return;
+  if(VISION_KEY.includes('YOUR_')){alert('Add your Cloud Vision API key in the <script> block!');return;}
+  setBusy(true);
+  toast('Uploading to Google Cloud Vision…');
+  try{
+    const b64=await toB64(file);
+    toast('Extracting text from image…');
+    const res=await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${VISION_KEY}`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({requests:[{image:{content:b64},features:[{type:'DOCUMENT_TEXT_DETECTION'}]}]})
+    });
+    if(!res.ok){const e=await res.json();throw new Error(e?.error?.message||'Vision API error '+res.status);}
+    const data=await res.json();
+    const txt=data?.responses?.[0]?.fullTextAnnotation?.text;
+    if(!txt) throw new Error('No text detected — try a clearer, well-lit photo.');
+    toast('Parsing fields…');
+    const ex=parseOcr(txt);
+    setFormObj(ex);
+    ex.parsedItems.forEach(ei=>{
+      const idx=ei.slNo-1;
+      if(idx>=0&&idx<ROWS){
+        if(ei.desc) items[idx].desc=ei.desc;
+        if(ei.part) items[idx].part=ei.part;
+        if(ei.qty)  items[idx].qty=ei.qty;
+        if(ei.crp)  items[idx].crp=ei.crp;
+      }
+    });
+    buildTable();
+    saveLocal();
+    toast('Done! Review and correct any fields.','ok');
+  }catch(err){
+    toast(err.message,'err');
+  }finally{
+    setBusy(false);
+    $('inp-cam').value='';
+    $('inp-gal').value='';
+  }
+}
+$('inp-cam').addEventListener('change',e=>doScan(e.target.files[0]));
+$('inp-gal').addEventListener('change',e=>doScan(e.target.files[0]));
+
+/* ── SUBMIT ────────────────────────────────────────────────────────── */
+async function submitForm(){
+  const fields=getFormObj();
+  if(!fields.otfNumber&&!fields.customerName){alert('Please fill in OTF Number or Customer Name first.');return;}
+  if(BACKEND_URL.includes('your-backend')){alert('Set your BACKEND_URL in the <script> block!');return;}
+  setBusy(true);
+  toast('Saving to backend…');
+  try{
+    const filled=items.filter(it=>it.desc||it.part||it.qty||it.crp);
+    const headers={'Content-Type':'application/json'};
+    if(SECRET_TOKEN&&!SECRET_TOKEN.includes('YOUR_')) headers['x-secret-token']=SECRET_TOKEN;
+    const res=await fetch(BACKEND_URL,{
+      method:'POST',headers,
+      body:JSON.stringify({...fields,totalPrice:getTotal(),items:filled})
+    });
+    const data=await res.json();
+    if(data.status==='success') toast('Saved successfully!','ok');
+    else throw new Error(data.message||'Backend returned an error');
+  }catch(err){toast(err.message,'err');}
+  finally{setBusy(false);}
+}
+
+/* ── INIT ──────────────────────────────────────────────────────────── */
+$('f-date').value=todayStr();
+buildTable();
+loadLocal();
+</script>
+</body>
+</html>
